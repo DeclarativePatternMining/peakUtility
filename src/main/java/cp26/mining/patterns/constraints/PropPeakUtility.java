@@ -1,12 +1,5 @@
-/*
- * This file is part of cp26:peakutility (https://gitlab.com/chaver/choco-mining)
- *
- * Copyright (c) 2026, IMT Atlantique
- *
- * Licensed under the MIT license.
- *
- * See LICENSE file in the project root for full license information.
- */
+
+package cp26.mining.patterns.constraints;
 
 import java.util.BitSet;
 
@@ -107,131 +100,187 @@ public class PropPeakUtility extends Propagator<BoolVar> {
                 free[freeSize++] = i;
         }
 
-        // =====================================================
+        // ==================================================
         // Phase 1: High-utility pruning (Rules 1--5)
-        // =====================================================
+        // ==================================================
 
-        if (onesSize == 0) {
-            // Rule 2 can still eliminate items with empty cover
-            for (int i = 0; i < freeSize; i++) {
-                int item = free[i];
-                if (itemCovers[item].isEmpty()) {
-                    vars[item].instantiateTo(0, this);
-                }
-            }
+        if (onesSize == 0)
             return;
-        }
 
-        // Rule 1: cover-based feasibility
+        // --------------------------------------------------
+        // Cover-based feasibility (Rules 1--2)
+        // --------------------------------------------------
+
+        // Rule 1: cover(x^{-1}(1)) must be non-empty
         currentBS.clear();
         currentBS.or(itemCovers[ones[0]]);
+
         for (int i = 1; i < onesSize; i++) {
+
             currentBS.and(itemCovers[ones[i]]);
+
             if (currentBS.isEmpty()) {
                 fails();
                 return;
             }
         }
 
-        // Rule 2: cover-based pruning for free items
+        // Rule 2: prune free items whose extension makes cover empty
         for (int i = 0; i < freeSize; i++) {
+
             int item = free[i];
+
             tmpBS.clear();
             tmpBS.or(currentBS);
             tmpBS.and(itemCovers[item]);
+
             if (tmpBS.isEmpty()) {
                 vars[item].instantiateTo(0, this);
             }
         }
 
-        // Utility of current pattern u(P)
+        // --------------------------------------------------
+        // Utility-based pruning (Rules 3--5)
+        // --------------------------------------------------
+
+        // Utility U(S)
+
         long uP = 0;
         int tid = currentBS.nextSetBit(0);
+
         while (tid >= 0) {
-            for (int i = 0; i < onesSize; i++) {
+
+            for (int i = 0; i < onesSize; i++)
                 uP += iutils[ones[i]][tid];
+
+            tid = currentBS.nextSetBit(tid + 1);
+        }
+
+        if (mode == Mode.HUI || mode == Mode.UPI ) {
+
+            // Rule 3: TWU(x^{-1}(1)) >= theta
+            long twu = 0;
+
+            tid = currentBS.nextSetBit(0);
+            while (tid >= 0) {
+
+                twu += transactionUtilities[tid];
+                tid = currentBS.nextSetBit(tid + 1);
             }
-            tid = currentBS.nextSetBit(tid + 1);
-        }
+            
+            if (twu < theta) {
+                fails();
+                return;
+            }
 
-        // Rule 3: TWU of current pattern
-        long twu = 0;
-        tid = currentBS.nextSetBit(0);
-        while (tid >= 0) {
-            twu += transactionUtilities[tid];
-            tid = currentBS.nextSetBit(tid + 1);
-        }
-        if (twu < theta) {
-            fails();
-            return;
-        }
+            // Rule 4: UB = u(P) + ru(P, free)
+            long ru = 0;
 
-        // Rule 4: UB = u(P) + ru(P, free)
-        long ru = 0;
-        for (int i = 0; i < freeSize; i++) {
-            int item = free[i];
-            for (Custom_Element e : elements[item]) {
-                if (currentBS.get(e.tid)) {
-                    ru += e.iutil;
+            for (int i = 0; i < freeSize; i++) {
+
+                int item = free[i];
+
+                for (Custom_Element e : elements[item]) {
+
+                    if (currentBS.get(e.tid))
+                        ru += e.iutil;
                 }
             }
-        }
-        long ub = uP + ru;
-        if (ub < theta) {
-            fails();
-            return;
-        }
 
-        // Rule 5: UB_i for each free item
-        for (int i = 0; i < freeSize; i++) {
-            int item = free[i];
-            tmpBS.clear();
-            tmpBS.or(currentBS);
-            tmpBS.and(itemCovers[item]);
-
-            if (tmpBS.isEmpty()) {
-                vars[item].instantiateTo(0, this);
-                continue;
+            if (uP + ru < theta) {
+                fails();
+                return;
             }
 
-            long ruExt = 0;
-            for (int j = 0; j < freeSize; j++) {
-                int other = free[j];
-                if (other == item) {
+            // Rule 5: UB_i for each free item
+            for (int k2 = 0; k2 < freeSize; k2++) {
+
+                int item = free[k2];
+                
+                tmpBS.clear();
+                tmpBS.or(currentBS);
+                tmpBS.and(itemCovers[item]);
+
+                if (tmpBS.isEmpty()) {
                     continue;
                 }
-                for (Custom_Element e : elements[other]) {
-                    if (tmpBS.get(e.tid)) {
-                        ruExt += e.iutil;
-                    }
+
+                long utilItem = 0;
+
+                for (Custom_Element e : elements[item]) {
+                    if (tmpBS.get(e.tid))
+                        utilItem += e.iutil;
                 }
+
+                long ruExt = ru - utilItem;
+
+                if (uP + utilItem + ruExt < theta) {
+                    vars[item].instantiateTo(0, this);
+                    continue;
+                }
+
             }
 
-            long ub_i = uP + ruExt;
-            if (ub_i < theta) {
-                vars[item].instantiateTo(0, this);
-            }
+            // IMPORTANT: enforce constraint when fully assigned
+            if (freeSize == 0 && uP < theta) {
+                fails();
+            } 
         }
 
-        // =====================================================
+        // ==================================================
         // Phase 2: Peak condition enforcement (Rules 6--8)
-        // =====================================================
+        // ==================================================
 
-        if (mode == Mode.UPI) {
+        if (mode == Mode.UPI ) {
 
-            // Rules 6--7: only at complete assignment
+            onesSize = 0;
+            zerosSize = 0;
+            freeSize = 0;
+
+            for (int i = 0; i < vars.length; i++) {
+
+                if (vars[i].isInstantiatedTo(1))
+                    ones[onesSize++] = i;
+                else if (vars[i].isInstantiatedTo(0))
+                    zeros[zerosSize++] = i;
+                else
+                    free[freeSize++] = i;
+            }
+
+            if (onesSize == 0)
+                return;
+
+            // -------------------------------------------------
+            // Compute cover(P)
+            // -------------------------------------------------
+
+            currentBS.clear();
+            currentBS.or(itemCovers[ones[0]]);
+
+            for (int i = 1; i < onesSize; i++)
+            	currentBS.and(itemCovers[ones[i]]);
+
+
+
+            // ===============================================
+            // Rules 6--7: Verification at complete assignment
+            // ===============================================
+
             if (freeSize == 0) {
-                // Rule 6: subset dominance
+
+                // subset dominance
                 for (int idx = 0; idx < onesSize; idx++) {
+
                     int removed = ones[idx];
-                    if (onesSize == 1) {
-                        continue;
-                    }
+
                     tmpBS.clear();
                     boolean first = true;
+
                     for (int i = 0; i < onesSize; i++) {
+
                         int it = ones[i];
                         if (it == removed) continue;
+
                         if (first) {
                             tmpBS.or(itemCovers[it]);
                             first = false;
@@ -241,13 +290,14 @@ public class PropPeakUtility extends Propagator<BoolVar> {
                     }
 
                     long uSub = 0;
+
                     tid = tmpBS.nextSetBit(0);
                     while (tid >= 0) {
-                        for (int i = 0; i < onesSize; i++) {
-                            if (ones[i] != removed) {
+
+                        for (int i = 0; i < onesSize; i++)
+                            if (ones[i] != removed)
                                 uSub += iutils[ones[i]][tid];
-                            }
-                        }
+
                         tid = tmpBS.nextSetBit(tid + 1);
                     }
 
@@ -257,80 +307,122 @@ public class PropPeakUtility extends Propagator<BoolVar> {
                     }
                 }
 
-                // Rule 7: superset dominance
+                // superset dominance
                 for (int i = 0; i < zerosSize; i++) {
+
                     int item = zeros[i];
+
                     tmpBS.clear();
                     tmpBS.or(currentBS);
                     tmpBS.and(itemCovers[item]);
-                    if (tmpBS.isEmpty()) {
-                        continue;
-                    }
 
-                    long uSup = 0;
-                    tid = tmpBS.nextSetBit(0);
-                    while (tid >= 0) {
-                        for (int j = 0; j < onesSize; j++) {
-                            uSup += iutils[ones[j]][tid];
+                    if (!tmpBS.isEmpty()) {
+
+                        long uSup = 0;
+
+                        tid = tmpBS.nextSetBit(0);
+                        while (tid >= 0) {
+
+                            for (int j = 0; j < onesSize; j++)
+                                uSup += iutils[ones[j]][tid];
+
+                            uSup += iutils[item][tid];
+
+                            tid = tmpBS.nextSetBit(tid + 1);
                         }
-                        uSup += iutils[item][tid];
-                        tid = tmpBS.nextSetBit(tid + 1);
-                    }
 
-                    if (uSup >= uP) {
-                        fails();
-                        return;
+                        if (uSup >= uP) {
+                            fails();
+                            return;
+                        }
                     }
                 }
 
                 return;
             }
 
-            // Rule 8: depth-k exhaustive subset pruning
+            // ==================================================
+            // Rule 8: Depth-k exhaustive subset pruning
+            // ==================================================
+
             if (k > 0 && freeSize == k) {
-                boolean allLower = true;
-                int subsetCount = (1 << freeSize) - 1;
-                for (int mask = 1; mask <= subsetCount; mask++) {
+
+                boolean allSubsetsLower = true;
+
+                for (int idx = 0; idx < onesSize; idx++) {
+
+                    int removed = ones[idx];
+
                     tmpBS.clear();
                     boolean first = true;
-                    for (int i = 0; i < freeSize; i++) {
-                        if ((mask & (1 << i)) == 0) continue;
-                        int item = free[i];
+
+                    for (int i = 0; i < onesSize; i++) {
+
+                        int it = ones[i];
+                        if (it == removed) continue;
+
                         if (first) {
-                            tmpBS.or(itemCovers[item]);
+                            tmpBS.or(itemCovers[it]);
                             first = false;
                         } else {
-                            tmpBS.and(itemCovers[item]);
-                        }
-                        if (tmpBS.isEmpty()) {
-                            break;
+                            tmpBS.and(itemCovers[it]);
                         }
                     }
 
                     long uSub = 0;
-                    if (!tmpBS.isEmpty()) {
-                        tid = tmpBS.nextSetBit(0);
-                        while (tid >= 0) {
-                            for (int i = 0; i < freeSize; i++) {
-                                if ((mask & (1 << i)) != 0) {
-                                    uSub += iutils[free[i]][tid];
-                                }
-                            }
-                            tid = tmpBS.nextSetBit(tid + 1);
-                        }
+
+                    tid = tmpBS.nextSetBit(0);
+                    while (tid >= 0) {
+
+                        for (int i = 0; i < onesSize; i++)
+                            if (ones[i] != removed)
+                                uSub += iutils[ones[i]][tid];
+
+                        tid = tmpBS.nextSetBit(tid + 1);
                     }
 
                     if (uSub >= uP) {
-                        allLower = false;
+                        allSubsetsLower = false;
                         break;
                     }
                 }
 
-                if (allLower) {
+                if (allSubsetsLower) {
+
+                    boolean allSupersetsLower = true;
+
                     for (int i = 0; i < freeSize; i++) {
+
                         int item = free[i];
-                        if (vars[item].contains(1)) {
-                            vars[item].removeValue(1, this);
+
+                        long remainingUtility = 0;
+
+                        tid = currentBS.nextSetBit(0);
+
+                        while (tid >= 0) {
+
+                            if (itemCovers[item].get(tid))
+                                remainingUtility += iutils[item][tid];
+
+                            tid = currentBS.nextSetBit(tid + 1);
+                        }
+
+                        long upperBound = uP + remainingUtility;
+
+                        if (upperBound >= uP) {
+                            allSupersetsLower = false;
+                            break;
+                        }
+                    }
+
+                    if (allSupersetsLower) {
+
+                        for (int i = 0; i < freeSize; i++) {
+
+                            int item = free[i];
+
+                            if (vars[item].contains(1))
+                                vars[item].removeValue(1, this);
                         }
                     }
                 }

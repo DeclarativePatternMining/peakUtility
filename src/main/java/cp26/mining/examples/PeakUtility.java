@@ -584,7 +584,7 @@ public class PeakUtility {
         String inputFile = args.length > 0 ? args[0] : "datasets/Data_SPMF/chess_utility_spmf.txt";
         String outputFile = args.length > 1 ? args[1] : "datasets/output_peakutil.txt";
         int minUtil = args.length > 2 ? Integer.parseInt(args[2]) : 600000;
-        String modeStr = args.length > 3 ? args[3].toUpperCase() : "HUI";
+        String modeStr = args.length > 3 ? args[3].trim().toUpperCase() : "HUI";
         long timeoutMs = args.length > 4 ? Long.parseLong(args[4]) : 300000L;
         int depthK = args.length > 5 ? Integer.parseInt(args[5]) : 3;
         String varHeurStr = args.length > 6 ? args[6].toUpperCase() : "ITEM_UTIL_ASC";
@@ -593,7 +593,7 @@ public class PeakUtility {
         // Validate mode
         PropPeakUtility.Mode mode;
         try {
-            mode = PropPeakUtility.Mode.valueOf(modeStr);
+            mode = Enum.valueOf(PropPeakUtility.Mode.class, modeStr);
         } catch (IllegalArgumentException e) {
             System.err.println("Unknown mode: " + modeStr);
             printUsage();
