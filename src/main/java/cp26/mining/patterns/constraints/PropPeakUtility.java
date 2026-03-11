@@ -7,7 +7,6 @@
  *
  * See LICENSE file in the project root for full license information.
  */
-package cp26.mining.patterns.constraints;
 
 import java.util.BitSet;
 
