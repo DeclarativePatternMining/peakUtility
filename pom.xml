@@ -134,35 +134,6 @@
                 </executions>
             </plugin>
             <plugin>
-                <groupId>com.mycila</groupId>
-                <artifactId>license-maven-plugin</artifactId>
-                <version>4.1</version>
-                <configuration>
-                    <header>etc/header.txt</header>
-                    <properties>
-                        <year>${maven.build.timestamp}</year>
-                        <owner>IMT Atlantique</owner>
-                        <project>${project.groupId}:${project.artifactId}</project>
-                    </properties>
-                    <mapping>
-                        <template>JAVADOC_STYLE</template>
-                        <java>SLASHSTAR_STYLE</java>
-                    </mapping>
-                    <includes>
-                        <include>**/*.java</include>
-                        <include>**/pom.xml</include>
-                    </includes>
-                </configuration>
-                <executions>
-                    <execution>
-                        <phase>compile</phase>
-                        <goals>
-                            <goal>format</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.3.2</version>

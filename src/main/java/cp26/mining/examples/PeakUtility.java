@@ -1,12 +1,3 @@
-/*
- * This file is part of cp26:peakutility (https://gitlab.com/chaver/choco-mining)
- *
- * Copyright (c) 2026, IMT Atlantique
- *
- * Licensed under the MIT license.
- *
- * See LICENSE file in the project root for full license information.
- */
 package cp26.mining.examples;
 
 import java.io.FileWriter;
@@ -114,6 +105,7 @@ public class PeakUtility {
         public VarHeuristic varHeuristic = VarHeuristic.ITEM_UTIL_ASC;
         public ValHeuristic valHeuristic = ValHeuristic.MIN;
         public long timeoutMs = 0L;
+        public String rulesMask = "11111111";
 
         public Config(String inputFile, String outputFile) {
             this.inputFile = inputFile;
@@ -172,6 +164,14 @@ public class PeakUtility {
             this.timeoutMs = timeoutMs;
             return this;
         }
+
+        public Config withRulesMask(String rulesMask) {
+            if (rulesMask == null || !rulesMask.matches("[01]{8}")) {
+                throw new IllegalArgumentException("rulesMask must be 8 chars of 0/1");
+            }
+            this.rulesMask = rulesMask;
+            return this;
+        }
     }
 
     // =========================================================================
@@ -216,6 +216,7 @@ public class PeakUtility {
         public float solverTimeSec;
         public int nbItems;
         public int nbTransactions;
+        public long rule8Triggers;
 
         public MiningResults() {
             this.patterns = new ArrayList<>();
@@ -319,9 +320,13 @@ public class PeakUtility {
 
         model.sum(x, "=", patternLength).post();
         // Post unified PeakUtility constraint
+        int rulesMask = parseRulesMask(config.rulesMask);
+        PropPeakUtility propagator = new PropPeakUtility(
+                x, minutil, config.depthK, transactionUtilities, itemULs, transactionUtilities.length, config.mode, rulesMask
+        );
         new Constraint(
                 "PeakUtility",
-                new PropPeakUtility(x, minutil, config.depthK, transactionUtilities, itemULs, transactionUtilities.length, config.mode)
+                propagator
         ).post();
 
         if (config.verbose) {
@@ -390,6 +395,7 @@ public class PeakUtility {
             results.restartCount = m.getRestartCount();
             results.decisionCount = m.getDecisionCount();
             results.solverTimeSec = m.getTimeCount();
+            results.rule8Triggers = propagator.getRule8TriggerCount();
 
             if (config.verbose) {
                 if (results.timeoutReached) {
@@ -418,6 +424,19 @@ public class PeakUtility {
     // =========================================================================
     // HELPER METHODS
     // =========================================================================
+
+    private static int parseRulesMask(String mask) {
+        if (mask == null || !mask.matches("[01]{8}")) {
+            throw new IllegalArgumentException("rulesMask must be 8 chars of 0/1");
+        }
+        int value = 0;
+        for (int i = 0; i < 8; i++) {
+            if (mask.charAt(i) == '1') {
+                value |= (1 << i);
+            }
+        }
+        return value;
+    }
 
     private UtilityList_0[] buildUtilityLists_v0(TransactionalDatabase database, int[][] itemUtils, 
                                                    int nbItems, int nbTrans) {
@@ -554,7 +573,7 @@ public class PeakUtility {
     }
 
     private static void printUsage() {
-        System.err.println("\nUsage: java PeakUtility [inputFile] [outputFile] [minUtil] [mode] [timeoutMs] [depthK] [varHeuristic] [valHeuristic]");
+        System.err.println("\nUsage: java PeakUtility [inputFile] [outputFile] [minUtil] [mode] [timeoutMs] [depthK] [varHeuristic] [valHeuristic] [rulesMask]");
         System.err.println("\nPositional Arguments:");
         System.err.println("  1. inputFile       : Input dataset file (default: datasets/Data_SPMF/accidents_utility_spmf.txt)");
         System.err.println("  2. outputFile      : Output results file (default: datasets/output_peakutil.txt)");
@@ -568,6 +587,7 @@ public class PeakUtility {
         System.err.println("                                  CHOCO_FIRST_FAIL, CHOCO_DOM_OVER_WDEG, CHOCO_DEFAULT");
         System.err.println("  8. valHeuristic    : Value selection heuristic (default: MIN)");
         System.err.println("                       Available: MIN, MAX");
+        System.err.println("  9. rulesMask       : 8-bit mask for rules R1..R8 (default: 11111111)");
         System.err.println("\nExamples:");
         System.err.println("  # HUI mode with default settings");
         System.err.println("  java PeakUtility datasets/Data_SPMF/chess_utility_spmf.txt results.txt 150000 HUI");
@@ -589,6 +609,7 @@ public class PeakUtility {
         int depthK = args.length > 5 ? Integer.parseInt(args[5]) : 3;
         String varHeurStr = args.length > 6 ? args[6].toUpperCase() : "ITEM_UTIL_ASC";
         String valHeurStr = args.length > 7 ? args[7].toUpperCase() : "MIN";
+        String rulesMask = args.length > 8 ? args[8].trim() : "11111111";
 
         // Validate mode
         PropPeakUtility.Mode mode;
@@ -623,6 +644,13 @@ public class PeakUtility {
             return;
         }
 
+        if (!rulesMask.matches("[01]{8}")) {
+            System.err.println("Invalid rulesMask: " + rulesMask + " (expected 8 chars of 0/1)");
+            printUsage();
+            System.exit(1);
+            return;
+        }
+
         // Print configuration
         System.out.println("\n" + fillString("=", 70));
         System.out.println("PEAKUTILITY MINING ENGINE");
@@ -634,6 +662,7 @@ public class PeakUtility {
         System.out.println("Timeout (ms)     : " + (timeoutMs > 0 ? timeoutMs : "No timeout"));
         System.out.println("Var heuristic    : " + varHeuristic);
         System.out.println("Val heuristic    : " + valHeuristic);
+        System.out.println("Rules mask       : " + rulesMask);
         if (mode == PropPeakUtility.Mode.UPI) {
             System.out.println("Depth K          : " + depthK);
         }
@@ -646,7 +675,8 @@ public class PeakUtility {
                 .withVarHeuristic(varHeuristic)
                 .withValHeuristic(valHeuristic)
                 .withVerbose(false)
-                .withDetailedStats(true);
+                .withDetailedStats(true)
+                .withRulesMask(rulesMask);
 
         if (timeoutMs > 0) {
             config.withTimeoutMs(timeoutMs);
@@ -660,6 +690,12 @@ public class PeakUtility {
         PeakUtility miner = new PeakUtility(config);
         MiningResults results = miner.run();
         results.printStats();
+        System.out.println("RESULT\talgorithm=PeakUtility"
+                + "\tpatterns=" + results.patternCount
+                + "\ttimeoutReached=" + results.timeoutReached
+                + "\tnodes=" + results.nodeCount
+                + "\tsolverTimeSec=" + results.solverTimeSec
+                + "\trule8Triggers=" + results.rule8Triggers);
 
         System.out.println(fillString("=", 70) + "\n");
     }

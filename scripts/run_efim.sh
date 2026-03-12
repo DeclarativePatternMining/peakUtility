@@ -3,12 +3,16 @@ set -euo pipefail
 
 # Resolve project root so this works from any current directory, even if script is moved.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$SCRIPT_DIR/SPMF/EfimRunner.java" ]; then
-  ROOT_DIR="$SCRIPT_DIR"
-elif [ -f "$SCRIPT_DIR/../SPMF/EfimRunner.java" ]; then
+if [ -f "$SCRIPT_DIR/../pom.xml" ]; then
   ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 else
-  echo "Error: cannot locate SPMF/EfimRunner.java from script directory '$SCRIPT_DIR'"
+  echo "Error: cannot locate project root (missing pom.xml) from script directory '$SCRIPT_DIR'"
+  exit 1
+fi
+
+EFIM_SRC="$ROOT_DIR/src/main/java/cp26/mining/patterns/efim/EfimRunner.java"
+if [ ! -f "$EFIM_SRC" ]; then
+  echo "Error: cannot locate EfimRunner.java at '$EFIM_SRC'"
   exit 1
 fi
 
@@ -57,8 +61,10 @@ elif [ -f "$ROOT_DIR/datasets/$DATASET.txt" ]; then
   DATASET_ARG="$ROOT_DIR/datasets/$DATASET.txt"
 fi
 
-javac "$ROOT_DIR/SPMF/EfimRunner.java"
+EFIM_CLASSES_DIR="$ROOT_DIR/target/efim-runner"
+mkdir -p "$EFIM_CLASSES_DIR"
+javac -d "$EFIM_CLASSES_DIR" "$EFIM_SRC"
 (
   cd "$ROOT_DIR"
-  java -cp "$ROOT_DIR/SPMF:$JAR_PATH" EfimRunner "$DATASET_ARG" "$MINUTIL" "$JAR_PATH" "$TIMEOUT_MINUTES"
+  java -cp "$EFIM_CLASSES_DIR:$JAR_PATH" EfimRunner "$DATASET_ARG" "$MINUTIL" "$JAR_PATH" "$TIMEOUT_MINUTES"
 )

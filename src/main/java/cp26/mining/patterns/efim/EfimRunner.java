@@ -1,12 +1,3 @@
-/*
- * This file is part of cp26:peakutility (https://gitlab.com/chaver/choco-mining)
- *
- * Copyright (c) 2026, IMT Atlantique
- *
- * Licensed under the MIT license.
- *
- * See LICENSE file in the project root for full license information.
- */
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;

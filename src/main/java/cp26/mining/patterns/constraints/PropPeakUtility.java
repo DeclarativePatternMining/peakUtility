@@ -24,6 +24,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
     private final int theta;
     private final int k;
     private final int nTrans;
+    private final int rulesMask;
 
     private final BitSet[] itemCovers;
     private final int[][] iutils;
@@ -40,6 +41,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
 
     private final BitSet currentBS;
     private final BitSet tmpBS;
+    private long rule8TriggerCount;
 
     public PropPeakUtility(
             BoolVar[] vars,
@@ -49,6 +51,18 @@ public class PropPeakUtility extends Propagator<BoolVar> {
             UtilityList_0[] itemULs,
             int nTrans,
             Mode mode) {
+        this(vars, theta, k, transactionUtilities, itemULs, nTrans, mode, 0xFF);
+    }
+
+    public PropPeakUtility(
+            BoolVar[] vars,
+            int theta,
+            int k,
+            int[] transactionUtilities,
+            UtilityList_0[] itemULs,
+            int nTrans,
+            Mode mode,
+            int rulesMask) {
 
         super(vars, PropagatorPriority.LINEAR, false);
 
@@ -57,6 +71,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
         this.k = k;
         this.transactionUtilities = transactionUtilities;
         this.nTrans = nTrans;
+        this.rulesMask = rulesMask;
 
         int nItems = vars.length;
 
@@ -83,6 +98,14 @@ public class PropPeakUtility extends Propagator<BoolVar> {
         }
     }
 
+    private boolean ruleEnabled(int ruleIndex) {
+        return (rulesMask & (1 << (ruleIndex - 1))) != 0;
+    }
+
+    public long getRule8TriggerCount() {
+        return rule8TriggerCount;
+    }
+
     @Override
     public void propagate(int evtmask) throws ContradictionException {
 
@@ -99,6 +122,15 @@ public class PropPeakUtility extends Propagator<BoolVar> {
             else
                 free[freeSize++] = i;
         }
+
+        boolean r1 = ruleEnabled(1);
+        boolean r2 = ruleEnabled(2);
+        boolean r3 = ruleEnabled(3);
+        boolean r4 = ruleEnabled(4);
+        boolean r5 = ruleEnabled(5);
+        boolean r6 = ruleEnabled(6);
+        boolean r7 = ruleEnabled(7);
+        boolean r8 = ruleEnabled(8);
 
         // ==================================================
         // Phase 1: High-utility pruning (Rules 1--5)
@@ -119,14 +151,14 @@ public class PropPeakUtility extends Propagator<BoolVar> {
 
             currentBS.and(itemCovers[ones[i]]);
 
-            if (currentBS.isEmpty()) {
+            if (r1 && currentBS.isEmpty()) {
                 fails();
                 return;
             }
         }
 
         // Rule 2: prune free items whose extension makes cover empty
-        for (int i = 0; i < freeSize; i++) {
+        if (r2) for (int i = 0; i < freeSize; i++) {
 
             int item = free[i];
 
@@ -159,41 +191,44 @@ public class PropPeakUtility extends Propagator<BoolVar> {
         if (mode == Mode.HUI || mode == Mode.UPI ) {
 
             // Rule 3: TWU(x^{-1}(1)) >= theta
-            long twu = 0;
+            if (r3) {
+                long twu = 0;
 
-            tid = currentBS.nextSetBit(0);
-            while (tid >= 0) {
+                tid = currentBS.nextSetBit(0);
+                while (tid >= 0) {
 
-                twu += transactionUtilities[tid];
-                tid = currentBS.nextSetBit(tid + 1);
-            }
-            
-            if (twu < theta) {
-                fails();
-                return;
+                    twu += transactionUtilities[tid];
+                    tid = currentBS.nextSetBit(tid + 1);
+                }
+
+                if (twu < theta) {
+                    fails();
+                    return;
+                }
             }
 
             // Rule 4: UB = u(P) + ru(P, free)
             long ru = 0;
+            if (r4 || r5) {
+                for (int i = 0; i < freeSize; i++) {
 
-            for (int i = 0; i < freeSize; i++) {
+                    int item = free[i];
 
-                int item = free[i];
+                    for (Custom_Element e : elements[item]) {
 
-                for (Custom_Element e : elements[item]) {
-
-                    if (currentBS.get(e.tid))
-                        ru += e.iutil;
+                        if (currentBS.get(e.tid))
+                            ru += e.iutil;
+                    }
                 }
             }
 
-            if (uP + ru < theta) {
+            if (r4 && uP + ru < theta) {
                 fails();
                 return;
             }
 
             // Rule 5: UB_i for each free item
-            for (int k2 = 0; k2 < freeSize; k2++) {
+            if (r5) for (int k2 = 0; k2 < freeSize; k2++) {
 
                 int item = free[k2];
                 
@@ -222,7 +257,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
             }
 
             // IMPORTANT: enforce constraint when fully assigned
-            if (freeSize == 0 && uP < theta) {
+            if (r4 && freeSize == 0 && uP < theta) {
                 fails();
             } 
         }
@@ -269,7 +304,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
             if (freeSize == 0) {
 
                 // subset dominance
-                for (int idx = 0; idx < onesSize; idx++) {
+                if (r6) for (int idx = 0; idx < onesSize; idx++) {
 
                     int removed = ones[idx];
 
@@ -308,7 +343,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
                 }
 
                 // superset dominance
-                for (int i = 0; i < zerosSize; i++) {
+                if (r7) for (int i = 0; i < zerosSize; i++) {
 
                     int item = zeros[i];
 
@@ -345,7 +380,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
             // Rule 8: Depth-k exhaustive subset pruning
             // ==================================================
 
-            if (k > 0 && freeSize == k) {
+            if (r8 && k > 0 && freeSize == k) {
 
                 boolean allSubsetsLower = true;
 
@@ -417,12 +452,18 @@ public class PropPeakUtility extends Propagator<BoolVar> {
 
                     if (allSupersetsLower) {
 
+                        boolean pruned = false;
                         for (int i = 0; i < freeSize; i++) {
 
                             int item = free[i];
 
-                            if (vars[item].contains(1))
+                            if (vars[item].contains(1)) {
                                 vars[item].removeValue(1, this);
+                                pruned = true;
+                            }
+                        }
+                        if (pruned) {
+                            rule8TriggerCount++;
                         }
                     }
                 }

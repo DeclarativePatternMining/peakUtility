@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Usage:
-#   bash scripts/run_compare_efim_peakutility.sh [datasetSelector] [minUtil] [timeoutSec] [depthK] [varHeur] [valHeur] [spmfJar]
+#   bash scripts/run_compare_efim_peakutility.sh [datasetSelector] [minUtil] [timeoutSec] [depthK] [varHeur] [valHeur] [rulesMask] [spmfJar]
 #
 # datasetSelector:
 #   - "test_dataset" (default): run all files in datasets/test_dataset/*.txt
@@ -19,7 +19,8 @@ TIMEOUT_SEC="${3:-60}"
 DEPTHK="${4:-3}"
 VAR_HEUR="${5:-TWU_DESC}"
 VAL_HEUR="${6:-MAX}"
-SPMF_JAR="${7:-$ROOT_DIR/SPMF/spmf.jar}"
+RULES_MASK="${7:-11111111}"
+SPMF_JAR="${8:-$ROOT_DIR/SPMF/spmf.jar}"
 
 if ! [[ "$TIMEOUT_SEC" =~ ^[0-9]+$ ]] || [ "$TIMEOUT_SEC" -le 0 ]; then
   echo "Error: timeoutSec must be a positive integer."
@@ -28,6 +29,10 @@ fi
 
 if ! [[ "$MINUTIL" =~ ^-?[0-9]+$ ]]; then
   echo "Error: minUtil must be an integer."
+  exit 1
+fi
+if ! [[ "$RULES_MASK" =~ ^[01]{8}$ ]]; then
+  echo "Error: rulesMask must be 8 chars of 0/1 (e.g. 11111111)."
   exit 1
 fi
 
@@ -51,8 +56,10 @@ resolve_single_dataset() {
 declare -a DATASETS=()
 if [ "$DATASET_SELECTOR" = "test_dataset" ]; then
   while IFS= read -r f; do
-    DATASETS+=("$f")
-  done < <(find "$ROOT_DIR/datasets/test_dataset" -maxdepth 1 -type f -name "*.txt" | sort)
+    [ -n "$f" ] && DATASETS+=("$f")
+  done <<EOF
+$(find "$ROOT_DIR/datasets/test_dataset" -maxdepth 1 -type f -name "*.txt" | sort)
+EOF
 else
   if resolved="$(resolve_single_dataset "$DATASET_SELECTOR")"; then
     DATASETS+=("$resolved")
@@ -106,7 +113,10 @@ count_lines() {
 }
 
 echo "Compiling project once..."
-(cd "$ROOT_DIR" && mvn -q -DskipTests clean compile >/dev/null)
+if ! (cd "$ROOT_DIR" && mvn -DskipTests -Dlicense.skip=true clean compile); then
+  echo "Error: mvn compile failed. See output above."
+  exit 1
+fi
 
 for ds in "${DATASETS[@]}"; do
   base="$(basename "$ds" .txt)"
@@ -124,7 +134,7 @@ for ds in "${DATASETS[@]}"; do
     timeout_min=1
   fi
 
-  echo "[RUN] dataset=$base minutil=$MINUTIL timeout=${TIMEOUT_SEC}s depthK=$DEPTHK var=$VAR_HEUR val=$VAL_HEUR"
+  echo "[RUN] dataset=$base minutil=$MINUTIL timeout=${TIMEOUT_SEC}s depthK=$DEPTHK var=$VAR_HEUR val=$VAL_HEUR rules=$RULES_MASK"
 
   # 1) EFIM HUI
   (cd "$ROOT_DIR" && bash ./scripts/run_efim.sh "$ds" "$MINUTIL" "$SPMF_JAR" "$timeout_min" >/dev/null || true)
@@ -144,12 +154,12 @@ for ds in "${DATASETS[@]}"; do
   # 3) PeakUtility HUI
   (cd "$ROOT_DIR" && mvn -q -DskipTests exec:java \
     -Dexec.mainClass="cp26.mining.examples.PeakUtility" \
-    -Dexec.args="$ds $peak_hui $MINUTIL HUI $timeout_ms $DEPTHK $VAR_HEUR $VAL_HEUR" >/dev/null)
+    -Dexec.args="$ds $peak_hui $MINUTIL HUI $timeout_ms $DEPTHK $VAR_HEUR $VAL_HEUR $RULES_MASK" >/dev/null)
 
   # 4) PeakUtility UPI
   (cd "$ROOT_DIR" && mvn -q -DskipTests exec:java \
     -Dexec.mainClass="cp26.mining.examples.PeakUtility" \
-    -Dexec.args="$ds $peak_upi $MINUTIL UPI $timeout_ms $DEPTHK $VAR_HEUR $VAL_HEUR" >/dev/null)
+    -Dexec.args="$ds $peak_upi $MINUTIL UPI $timeout_ms $DEPTHK $VAR_HEUR $VAL_HEUR $RULES_MASK" >/dev/null)
 
   # 5) Compare itemsets (ignoring utility values)
   efim_hui_norm="$out_dir/efim_HUI.items.txt"
