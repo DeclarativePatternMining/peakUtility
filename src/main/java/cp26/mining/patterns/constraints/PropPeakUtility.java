@@ -41,7 +41,8 @@ public class PropPeakUtility extends Propagator<BoolVar> {
 
     private final BitSet currentBS;
     private final BitSet tmpBS;
-    private long rule8TriggerCount;
+    private long rule8ExecCount;
+    private long rule8PruneCount;
 
     public PropPeakUtility(
             BoolVar[] vars,
@@ -102,8 +103,12 @@ public class PropPeakUtility extends Propagator<BoolVar> {
         return (rulesMask & (1 << (ruleIndex - 1))) != 0;
     }
 
-    public long getRule8TriggerCount() {
-        return rule8TriggerCount;
+    public long getRule8ExecCount() {
+        return rule8ExecCount;
+    }
+
+    public long getRule8PruneCount() {
+        return rule8PruneCount;
     }
 
     @Override
@@ -381,6 +386,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
             // ==================================================
 
             if (r8 && k > 0 && freeSize == k) {
+                rule8ExecCount++;
 
                 boolean allSubsetsLower = true;
 
@@ -463,7 +469,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
                             }
                         }
                         if (pruned) {
-                            rule8TriggerCount++;
+                            rule8PruneCount++;
                         }
                     }
                 }

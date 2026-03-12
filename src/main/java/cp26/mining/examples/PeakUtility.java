@@ -216,7 +216,8 @@ public class PeakUtility {
         public float solverTimeSec;
         public int nbItems;
         public int nbTransactions;
-        public long rule8Triggers;
+        public long rule8ExecCount;
+        public long rule8PruneCount;
 
         public MiningResults() {
             this.patterns = new ArrayList<>();
@@ -395,7 +396,8 @@ public class PeakUtility {
             results.restartCount = m.getRestartCount();
             results.decisionCount = m.getDecisionCount();
             results.solverTimeSec = m.getTimeCount();
-            results.rule8Triggers = propagator.getRule8TriggerCount();
+            results.rule8ExecCount = propagator.getRule8ExecCount();
+            results.rule8PruneCount = propagator.getRule8PruneCount();
 
             if (config.verbose) {
                 if (results.timeoutReached) {
@@ -695,7 +697,8 @@ public class PeakUtility {
                 + "\ttimeoutReached=" + results.timeoutReached
                 + "\tnodes=" + results.nodeCount
                 + "\tsolverTimeSec=" + results.solverTimeSec
-                + "\trule8Triggers=" + results.rule8Triggers);
+                + "\trule8ExecCount=" + results.rule8ExecCount
+                + "\trule8PruneCount=" + results.rule8PruneCount);
 
         System.out.println(fillString("=", 70) + "\n");
     }

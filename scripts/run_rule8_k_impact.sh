@@ -116,7 +116,7 @@ TEX_FILE="$OUT_DIR/rule8_k_impact_table.tex"
 mkdir -p "$RUN_OUT_DIR"
 
 echo "dataset=$DATASET_PATH minUtil=$MINUTIL timeoutSecPerRun=$TIMEOUT_SEC mode=$MODE rules=$RULES_MASK var=$VAR_HEUR val=$VAL_HEUR kList=$K_LIST_CSV" > "$LOG_FILE"
-echo "run_ts,k,rule8_triggers,itemsets_found,timeout_reached,nodes,solver_time_sec,mode,rules_mask,var_heuristic,val_heuristic" > "$CSV_FILE"
+echo "run_ts,k,rule8_execs,rule8_prunes,itemsets_found,timeout_reached,nodes,solver_time_sec,mode,rules_mask,var_heuristic,val_heuristic" > "$CSV_FILE"
 
 cd "$ROOT_DIR"
 export JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home -v 21 2>/dev/null || true)}"
@@ -147,17 +147,18 @@ for k in "${K_VALUES[@]}"; do
 
   result_line="$(echo "$cmd_output" | awk -F'\t' '/^RESULT\talgorithm=PeakUtility/ {print; exit}')"
   if [ -z "$result_line" ]; then
-    echo "$run_ts,$k,0,0,true,0,0,$MODE,$RULES_MASK,$VAR_HEUR,$VAL_HEUR" >> "$CSV_FILE"
+    echo "$run_ts,$k,0,0,0,true,0,0,$MODE,$RULES_MASK,$VAR_HEUR,$VAL_HEUR" >> "$CSV_FILE"
     continue
   fi
 
-  rule8_triggers="$(echo "$result_line" | tr '\t' '\n' | awk -F'=' '$1=="rule8Triggers"{print $2}')"
+  rule8_execs="$(echo "$result_line" | tr '\t' '\n' | awk -F'=' '$1=="rule8ExecCount"{print $2}')"
+  rule8_prunes="$(echo "$result_line" | tr '\t' '\n' | awk -F'=' '$1=="rule8PruneCount"{print $2}')"
   itemsets_found="$(echo "$result_line" | tr '\t' '\n' | awk -F'=' '$1=="patterns"{print $2}')"
   timeout_reached="$(echo "$result_line" | tr '\t' '\n' | awk -F'=' '$1=="timeoutReached"{print $2}')"
   nodes="$(echo "$result_line" | tr '\t' '\n' | awk -F'=' '$1=="nodes"{print $2}')"
   solver_time="$(echo "$result_line" | tr '\t' '\n' | awk -F'=' '$1=="solverTimeSec"{print $2}')"
 
-  echo "$run_ts,$k,${rule8_triggers:-0},${itemsets_found:-0},${timeout_reached:-true},${nodes:-0},${solver_time:-0},$MODE,$RULES_MASK,$VAR_HEUR,$VAL_HEUR" >> "$CSV_FILE"
+  echo "$run_ts,$k,${rule8_execs:-0},${rule8_prunes:-0},${itemsets_found:-0},${timeout_reached:-true},${nodes:-0},${solver_time:-0},$MODE,$RULES_MASK,$VAR_HEUR,$VAL_HEUR" >> "$CSV_FILE"
 done
 
 escape_latex() {
@@ -176,13 +177,13 @@ escape_latex() {
   echo "\\begin{table}[ht]"
   echo "\\centering"
   echo "\\caption{Rule 8 depth $k$ impact on ${ds_tex} (minUtil=${MINUTIL}, timeout=${TIMEOUT_SEC}s, mode=${MODE}, rules=${RULES_MASK}, var=${VAR_HEUR}, val=${VAL_HEUR}).}"
-  echo "\\begin{tabular}{rrrrr}"
+  echo "\\begin{tabular}{rrrrrr}"
   echo "\\hline"
-  echo "$k$ & Rule8 fires & Itemsets & Nodes & Time (s) \\\\"
+  echo "$k$ & Rule8 execs & Rule8 prunes & Itemsets & Nodes & Time (s) \\\\"
   echo "\\hline"
 
-  tail -n +2 "$CSV_FILE" | while IFS=',' read -r _run_ts k rule8_triggers itemsets timeout nodes solver_time _mode _rules _var _val; do
-    echo "${k} & ${rule8_triggers} & ${itemsets} & ${nodes} & ${solver_time} \\\\"
+  tail -n +2 "$CSV_FILE" | while IFS=',' read -r _run_ts k rule8_execs rule8_prunes itemsets timeout nodes solver_time _mode _rules _var _val; do
+    echo "${k} & ${rule8_execs} & ${rule8_prunes} & ${itemsets} & ${nodes} & ${solver_time} \\\\"
   done
 
   echo "\\hline"
