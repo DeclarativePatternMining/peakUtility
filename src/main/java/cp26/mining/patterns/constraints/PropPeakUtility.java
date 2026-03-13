@@ -434,10 +434,9 @@ public class PropPeakUtility extends Propagator<BoolVar> {
 
                         int item = free[i];
 
-                        if (vars[item].contains(1)) {
-                            vars[item].removeValue(1, this);
+                            vars[item].setToFalse(this);
                             pruned = true;
-                        }
+                        
                     }
                     if (pruned) {
                         rule8PruneCount++;
