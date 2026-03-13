@@ -14,6 +14,9 @@ import cp26.mining.patterns.util.UtilityList_0;
 
 public class PropPeakUtility extends Propagator<BoolVar> {
 
+    private static final boolean DEBUG = Boolean.getBoolean("peak.debug");
+    private static final int DEBUG_LIMIT = Integer.getInteger("peak.debug.limit", 20);
+
     public enum Mode {
         UPI,
         HUI
@@ -43,6 +46,8 @@ public class PropPeakUtility extends Propagator<BoolVar> {
     private final BitSet tmpBS;
     private long rule8ExecCount;
     private long rule8PruneCount;
+    private int debugCount;
+    private int lastFailRule;
 
     public PropPeakUtility(
             BoolVar[] vars,
@@ -111,6 +116,20 @@ public class PropPeakUtility extends Propagator<BoolVar> {
         return rule8PruneCount;
     }
 
+    public int getLastFailRule() {
+        return lastFailRule;
+    }
+
+    private void failRule(int rule) throws ContradictionException {
+        lastFailRule = rule;
+        if (DEBUG && debugCount < DEBUG_LIMIT) {
+            System.err.println("[DEBUG][FAIL R" + rule + "] ones=" + onesSize
+                    + " zeros=" + zerosSize + " free=" + freeSize);
+            debugCount++;
+        }
+        fails();
+    }
+
     @Override
     public void propagate(int evtmask) throws ContradictionException {
 
@@ -157,7 +176,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
             currentBS.and(itemCovers[ones[i]]);
 
             if (r1 && currentBS.isEmpty()) {
-                fails();
+                failRule(1);
                 return;
             }
         }
@@ -206,10 +225,10 @@ public class PropPeakUtility extends Propagator<BoolVar> {
                     tid = currentBS.nextSetBit(tid + 1);
                 }
 
-                if (twu < theta) {
-                    fails();
-                    return;
-                }
+            if (twu < theta) {
+                failRule(3);
+                return;
+            }
             }
 
             // Rule 4: UB = u(P) + ru(P, free)
@@ -227,8 +246,8 @@ public class PropPeakUtility extends Propagator<BoolVar> {
                 }
             }
 
-            if (r4 && uP + ru < theta) {
-                fails();
+            if (r4 && freeSize > 0 && uP + ru < theta) {
+                failRule(4);
                 return;
             }
 
@@ -255,6 +274,27 @@ public class PropPeakUtility extends Propagator<BoolVar> {
                 long ruExt = ru - utilItem;
 
                 if (uP + utilItem + ruExt < theta) {
+                    if (DEBUG && debugCount < DEBUG_LIMIT) {
+                        long ruExtExact = 0;
+                        for (int j = 0; j < freeSize; j++) {
+                            int other = free[j];
+                            if (other == item) continue;
+                            for (Custom_Element e : elements[other]) {
+                                if (tmpBS.get(e.tid))
+                                    ruExtExact += e.iutil;
+                            }
+                        }
+                        long ubExact = uP + utilItem + ruExtExact;
+                        if (ubExact >= theta) {
+                            System.err.println("[DEBUG][R5] Potential unsafe prune item=" + item
+                                    + " ubApprox=" + (uP + utilItem + ruExt)
+                                    + " ubExact=" + ubExact
+                                    + " theta=" + theta
+                                    + " freeSize=" + freeSize
+                                    + " onesSize=" + onesSize);
+                            debugCount++;
+                        }
+                    }
                     vars[item].instantiateTo(0, this);
                     continue;
                 }
@@ -263,7 +303,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
 
             // IMPORTANT: enforce constraint when fully assigned
             if (r4 && freeSize == 0 && uP < theta) {
-                fails();
+                failRule(4);
             } 
         }
 
@@ -342,7 +382,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
                     }
 
                     if (uSub >= uP) {
-                        fails();
+                        failRule(6);
                         return;
                     }
                 }
@@ -372,7 +412,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
                         }
 
                         if (uSup >= uP) {
-                            fails();
+                            failRule(7);
                             return;
                         }
                     }
@@ -430,7 +470,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
                 if (allFreeSubset) {
 
                     boolean pruned = false;
-                    for (int i = 0; i < freeSize; i++) {
+                    for (int i = 0; i < freeSize-1; i++) {
 
                         int item = free[i];
 
