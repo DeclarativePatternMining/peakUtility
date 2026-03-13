@@ -388,89 +388,59 @@ public class PropPeakUtility extends Propagator<BoolVar> {
             if (r8 && k > 0 && freeSize == k) {
                 rule8ExecCount++;
 
-                boolean allSubsetsLower = true;
+                boolean allFreeSubset = true;
 
-                for (int idx = 0; idx < onesSize; idx++) {
-
-                    int removed = ones[idx];
+                int subsetCount = (1 << freeSize) - 1;
+                for (int mask = 1; mask <= subsetCount; mask++) {
 
                     tmpBS.clear();
-                    boolean first = true;
+                    tmpBS.or(currentBS);
 
-                    for (int i = 0; i < onesSize; i++) {
-
-                        int it = ones[i];
-                        if (it == removed) continue;
-
-                        if (first) {
-                            tmpBS.or(itemCovers[it]);
-                            first = false;
-                        } else {
-                            tmpBS.and(itemCovers[it]);
-                        }
+                    for (int i = 0; i < freeSize; i++) {
+                        if ((mask & (1 << i)) == 0)
+                            continue;
+                        int item = free[i];
+                        tmpBS.and(itemCovers[item]);
+                        if (tmpBS.isEmpty())
+                            break;
                     }
 
-                    long uSub = 0;
+                    if (tmpBS.isEmpty())
+                        continue;
 
+                    long uSub = 0;
                     tid = tmpBS.nextSetBit(0);
                     while (tid >= 0) {
 
                         for (int i = 0; i < onesSize; i++)
-                            if (ones[i] != removed)
-                                uSub += iutils[ones[i]][tid];
+                            uSub += iutils[ones[i]][tid];
+                        for (int i = 0; i < freeSize; i++)
+                            if ((mask & (1 << i)) != 0)
+                                uSub += iutils[free[i]][tid];
 
                         tid = tmpBS.nextSetBit(tid + 1);
                     }
 
                     if (uSub >= uP) {
-                        allSubsetsLower = false;
+                        allFreeSubset = false;
                         break;
                     }
                 }
 
-                if (allSubsetsLower) {
+                if (allFreeSubset) {
 
-                    boolean allSupersetsLower = true;
-
+                    boolean pruned = false;
                     for (int i = 0; i < freeSize; i++) {
 
                         int item = free[i];
 
-                        long remainingUtility = 0;
-
-                        tid = currentBS.nextSetBit(0);
-
-                        while (tid >= 0) {
-
-                            if (itemCovers[item].get(tid))
-                                remainingUtility += iutils[item][tid];
-
-                            tid = currentBS.nextSetBit(tid + 1);
-                        }
-
-                        long upperBound = uP + remainingUtility;
-
-                        if (upperBound >= uP) {
-                            allSupersetsLower = false;
-                            break;
+                        if (vars[item].contains(1)) {
+                            vars[item].removeValue(1, this);
+                            pruned = true;
                         }
                     }
-
-                    if (allSupersetsLower) {
-
-                        boolean pruned = false;
-                        for (int i = 0; i < freeSize; i++) {
-
-                            int item = free[i];
-
-                            if (vars[item].contains(1)) {
-                                vars[item].removeValue(1, this);
-                                pruned = true;
-                            }
-                        }
-                        if (pruned) {
-                            rule8PruneCount++;
-                        }
+                    if (pruned) {
+                        rule8PruneCount++;
                     }
                 }
             }
