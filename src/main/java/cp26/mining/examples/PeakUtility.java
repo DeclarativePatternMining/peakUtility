@@ -96,6 +96,8 @@ public class PeakUtility {
         public String inputFile;
         public String outputFile;
         public int minUtilAbsolute = 10000;
+        public double minUtilPercent = 1.0;
+
         public int depthK = 2;
         public PropPeakUtility.Mode mode = PropPeakUtility.Mode.HUI;
         public boolean writeToFile = true;
@@ -116,7 +118,10 @@ public class PeakUtility {
             this.minUtilAbsolute = minutil;
             return this;
         }
-
+        public Config withMinUtilPercentage(double minUtilPercent2) {
+            this.minUtilPercent = minUtilPercent2;
+            return this;
+        }
         public Config withDepthK(int k) {
             this.depthK = k;
             return this;
@@ -286,10 +291,22 @@ public class PeakUtility {
             System.out.println(String.format("✓ Dataset loaded: %d items, %d transactions", nbItems, nbTrans));
             System.out.println(String.format("✓ Mode: %s", config.mode.toString()));
         }
+	int[][] itemUtils = database.getTransactionItemUtilities();
+	int[] transactionUtilities = database.getTransactionUtilities();
+       long totalUtility = 0;
+	for (int u : transactionUtilities) {
+	    totalUtility += u;
+	}
 
-        int minutil = config.minUtilAbsolute;
-        if (minutil <= 0) minutil = 1;
+	// config.minUtilAbsolute now stores the percentage
+	double percent = config.minUtilPercent;
 
+	int minutil = (int) Math.ceil(totalUtility * percent / 100.0);
+
+	if (minutil <= 0) {
+	    minutil = 1;
+	}
+	
         if (config.verbose) {
             System.out.println(String.format("✓ Min utility threshold (absolute): %d", minutil));
         }
@@ -299,8 +316,7 @@ public class PeakUtility {
             System.out.println("Building UtilityList_0 structures...");
         }
 
-        int[][] itemUtils = database.getTransactionItemUtilities();
-        int[] transactionUtilities = database.getTransactionUtilities();
+
         UtilityList_0[] itemULs = buildUtilityLists_v0(database, itemUtils, nbItems, nbTrans);
 
         int[] itemTWU = computeItemTWU(database, transactionUtilities);
@@ -426,7 +442,13 @@ public class PeakUtility {
     // =========================================================================
     // HELPER METHODS
     // =========================================================================
-
+    private static long computeTotalUtility(int[] transactionUtilities) {
+    long total = 0;
+    for (int u : transactionUtilities) {
+        total += u;
+    }
+    return total;
+}
     private static int parseRulesMask(String mask) {
         if (mask == null || !mask.matches("[01]{8}")) {
             throw new IllegalArgumentException("rulesMask must be 8 chars of 0/1");
@@ -605,7 +627,7 @@ public class PeakUtility {
         // Parse command-line arguments
         String inputFile = args.length > 0 ? args[0] : "datasets/Data_SPMF/chess_utility_spmf.txt";
         String outputFile = args.length > 1 ? args[1] : "datasets/output_peakutil.txt";
-        int minUtil = args.length > 2 ? Integer.parseInt(args[2]) : 600000;
+        double minUtilPercent = Double.parseDouble(args[2]);
         String modeStr = args.length > 3 ? args[3].trim().toUpperCase() : "HUI";
         long timeoutMs = args.length > 4 ? Long.parseLong(args[4]) : 300000L;
         int depthK = args.length > 5 ? Integer.parseInt(args[5]) : 3;
@@ -659,7 +681,7 @@ public class PeakUtility {
         System.out.println(fillString("=", 70));
         System.out.println("Input file       : " + inputFile);
         System.out.println("Output file      : " + outputFile);
-        System.out.println("Minimum util     : " + minUtil);
+        System.out.println("Minimum util     : " + minUtilPercent);
         System.out.println("Mode             : " + mode);
         System.out.println("Timeout (ms)     : " + (timeoutMs > 0 ? timeoutMs : "No timeout"));
         System.out.println("Var heuristic    : " + varHeuristic);
@@ -672,7 +694,7 @@ public class PeakUtility {
 
         // Create and run configuration
         Config config = new Config(inputFile, outputFile)
-                .withMinUtilAbsolute(minUtil)
+        		.withMinUtilPercentage(minUtilPercent)
                 .withMode(mode)
                 .withVarHeuristic(varHeuristic)
                 .withValHeuristic(valHeuristic)
@@ -703,3 +725,4 @@ public class PeakUtility {
         System.out.println(fillString("=", 70) + "\n");
     }
 }
+
