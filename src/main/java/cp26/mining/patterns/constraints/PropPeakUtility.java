@@ -428,7 +428,7 @@ public class PropPeakUtility extends Propagator<BoolVar> {
             if (r8 && k > 0 && freeSize == k) {
                 rule8ExecCount++;
 
-                boolean allFreeSubset = true;
+                boolean candidate = false;
 
                 int subsetCount = (1 << freeSize) - 1;
                 for (int mask = 1; mask <= subsetCount; mask++) {
@@ -461,13 +461,13 @@ public class PropPeakUtility extends Propagator<BoolVar> {
                         tid = tmpBS.nextSetBit(tid + 1);
                     }
 
-                    if (uSub >= uP) {
-                        allFreeSubset = false;
+                    if (uSub >= theta) {
+                    	candidate = true;
                         break;
                     }
                 }
 
-                if (allFreeSubset) {
+                if (!candidate) {
 
                     boolean pruned = false;
                     for (int i = 0; i < freeSize-1; i++) {
@@ -491,3 +491,4 @@ public class PropPeakUtility extends Propagator<BoolVar> {
     	return ESat.UNDEFINED;
     }
 }
+
