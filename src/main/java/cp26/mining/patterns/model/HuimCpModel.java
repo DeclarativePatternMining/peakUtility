@@ -16,7 +16,7 @@ import org.chocosolver.solver.search.strategy.selectors.variables.VariableSelect
 import org.chocosolver.solver.variables.BoolVar;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.solver.search.strategy.Search;
-
+import org.chocosolver.solver.search.measure.IMeasures;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -37,7 +37,8 @@ public class HuimCpModel {
 
     private static String filePath;
     private static String outPath = null;
-    private static int minUtil = 10;
+    private static double minUtilPercent = 0.01;
+    private static int minUtil = 0;
     // user constraints (CLI)
     private static String includeStr = null;
     private static String excludeStr = null;
@@ -53,7 +54,7 @@ public class HuimCpModel {
     private static boolean useOptBound = false;
 
     // 20 minutes timeout
-    private static final long TIMEOUT_MS = 20L * 60L * 1000L;
+    private static long TIMEOUT_MS = 20L * 60L * 1000L;
     private static final int SCALE = 50;
 
     private int nTx, nItems;
@@ -89,19 +90,21 @@ public class HuimCpModel {
         // 13 includeCsv, 14 excludeCsv
         if (args.length > 0) filePath = args[0];
         if (args.length > 1) outPath = args[1];
-        if (args.length > 2) minUtil = Integer.parseInt(args[2]);
+	 if (args.length > 2) minUtilPercent = Double.parseDouble(args[2]);
         if (args.length > 3) modeStr = args[3];
         if (args.length > 4) depthK = Integer.parseInt(args[4]);
-        if (args.length > 5) minSize = Integer.parseInt(args[5]);
-        if (args.length > 6) maxSize = Integer.parseInt(args[6]);
-        if (args.length > 7) varSel = args[7];
-        if (args.length > 8) valSel = args[8];
-        if (args.length > 9) maxUtil = Integer.parseInt(args[9]);
-        if (args.length > 10) tuMin = Integer.parseInt(args[10]);
-        if (args.length > 11) tuMax = Integer.parseInt(args[11]);
-        if (args.length > 12) useOptBound = Boolean.parseBoolean(args[12]);
-        if (args.length > 13) includeStr = args[13];
-        if (args.length > 14) excludeStr = args[14];
+        //if (args.length > 5) minSize = Integer.parseInt(args[5]);
+        //if (args.length > 6) maxSize = Integer.parseInt(args[6]);
+        if (args.length > 5) varSel = args[5];
+        if (args.length > 6) valSel = args[6];
+        if (args.length > 7) TIMEOUT_MS = Long.parseLong(args[7])*1000;
+
+        //if (args.length > 9) maxUtil = Integer.parseInt(args[9]);
+        //if (args.length > 10) tuMin = Integer.parseInt(args[10]);
+        //if (args.length > 11) tuMax = Integer.parseInt(args[11]);
+       // if (args.length > 12) useOptBound = Boolean.parseBoolean(args[12]);
+       // if (args.length > 13) includeStr = args[13];
+       // if (args.length > 14) excludeStr = args[14];
 
         HuimCpModel h = new HuimCpModel();
         h.loadFile(filePath);
@@ -181,6 +184,20 @@ public class HuimCpModel {
         for (int i = 0; i < nItems; i++) {
             scaledUMax[i] = Math.max(1, uMax[i] / SCALE);
         }
+        long totalUtility = 0;
+
+	for (int tu : TU) {
+	    totalUtility += tu;
+	}
+
+	minUtil = (int) Math.ceil(totalUtility * minUtilPercent);
+
+	if (minUtil <= 0) {
+	    minUtil = 1;
+	}
+
+	System.out.println("MinUtil% : " + minUtilPercent);
+	System.out.println("MinUtil  : " + minUtil);
 
     }
 
@@ -342,47 +359,62 @@ public class HuimCpModel {
 
     /* ================= SOLVE ================= */
 
-    private void solve(String outputFile) throws IOException {
+   private void solve(String outputFile) throws IOException {
 
-        // Ensure output directory exists
-        File outF = new File(outputFile);
-        File parent = outF.getParentFile();
-        if (parent != null && !parent.exists()) {
-            if (!parent.mkdirs()) {
-                throw new IOException("Cannot create output directory: " + parent);
-            }
-        }
-
-        Solver solver = model.getSolver();
-        solver.setSearch(buildSearch(model, x, varSel, valSel, computeItemTwu(), computeItemUtility()));
-        solver.limitTime(TIMEOUT_MS);
-
-        long startNs = System.nanoTime();
-
-        long peakMemBytes = usedMemBytes();
-        long count = 0;
-
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(outF))) {
-
-            while (solver.solve()) {
-                count++;
-
-                // write pattern to file in an SPMF-like style:
-                bw.write(patternAsLine());
-                bw.newLine();
-
-                long cur = usedMemBytes();
-                if (cur > peakMemBytes) peakMemBytes = cur;
-            }
-        }
-
-        long timeMs = (System.nanoTime() - startNs) / 1_000_000L;
-        double peakMemMB = peakMemBytes / (1024.0 * 1024.0);
-
-        System.out.println("High utility itemsets count: " + count);
-        System.out.println("Total time ~: " + timeMs + " ms");
-        System.out.println("Max memory:" + peakMemMB);
+    File outF = new File(outputFile);
+    File parent = outF.getParentFile();
+    if (parent != null && !parent.exists()) {
+        parent.mkdirs();
     }
+
+    Solver solver = model.getSolver();
+    solver.setSearch(buildSearch(model, x, varSel, valSel, computeItemTwu(), computeItemUtility()));
+    solver.limitTime(TIMEOUT_MS);
+
+    long startNs = System.nanoTime();
+
+    long peakMemBytes = usedMemBytes();
+    long count = 0;
+
+    try (BufferedWriter bw = new BufferedWriter(new FileWriter(outF))) {
+
+        while (solver.solve()) {
+            count++;
+
+            bw.write(patternAsLine());
+            bw.newLine();
+
+            long cur = usedMemBytes();
+            if (cur > peakMemBytes) peakMemBytes = cur;
+        }
+    }
+
+    long timeMs = (System.nanoTime() - startNs) / 1_000_000L;
+    double timeSec = timeMs / 1000.0;
+    double peakMemMB = peakMemBytes / (1024.0 * 1024.0);
+
+    IMeasures m = solver.getMeasures();
+
+    long nodes = m.getNodeCount();
+    long fails = m.getFailCount();
+    long propagations = m.getFixpointCount();
+
+    long ts = System.currentTimeMillis();
+
+    System.out.println(
+        "RESULT"
+        + "\trun_ts=" + ts
+        + "\tvar_heuristic=" + varSel
+        + "\tval_heuristic=" + valSel
+        + "\tmode=" + modeStr
+        + "\tpatterns=" + count
+        + "\tnodes=" + nodes
+        + "\tfails=" + fails
+        + "\tpropagations=" + propagations
+        + "\tmemoryMB=" + peakMemMB
+        + "\ttime=" + timeSec
+    );
+}
 
     private String patternAsLine() {
         StringBuilder sb = new StringBuilder();
