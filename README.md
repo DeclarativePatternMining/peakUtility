@@ -17,10 +17,10 @@ mvn -q -DskipTests compile
 ```
 mvn -q -DskipTests exec:java \
   -Dexec.mainClass=cp26.mining.examples.PeakUtility \
-  -Dexec.args="datasets/Data_SPMF/mushroom_utility_spmf.txt datasets/output_peakutil.txt 20000 HUI 60000 3 TWU_DESC MAX"
+  -Dexec.args="datasets/Data_SPMF/mushroom_utility_spmf.txt datasets/output_peakutil.txt 0.05 HUI 60000 3 TWU_DESC MAX"
 ```
 
 ## EFIM baseline
 ```
-bash scripts/run_efim.sh datasets/Data_SPMF/mushroom_utility_spmf.txt 20000 SPMF/spmf.jar 5
+bash scripts/run_efim.sh datasets/Data_SPMF/mushroom_utility_spmf.txt 0,05 SPMF/spmf.jar 5
 ```
