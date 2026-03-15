@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
     <name>${project.groupId}:${project.artifactId}</name>
     <description>Data mining with Choco solver</description>
-    <url>https://gitlab.com/chaver/data-mining</url>
+    <url></url>
     <licenses>
         <license>
             <name>MIT license</name>
