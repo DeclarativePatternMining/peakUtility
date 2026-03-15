@@ -181,9 +181,7 @@ mvn -q exec:java \
 
 ### 3. EfimRunner (EFIM baseline)
 
-Launches the EFIM algorithm (a state-of-the-art HUI miner from SPMF) as a subprocess or via reflection. Used as a baseline for comparison with PeakUtility.
-
-> Requires `spmf.jar` (not included). Download from [philippe-fournier-viger.com/spmf](https://www.philippe-fournier-viger.com/spmf/index.php?link=download.php).
+> Requires `spmf.jar`. You can download it from [philippe-fournier-viger.com/spmf](https://www.philippe-fournier-viger.com/spmf/index.php?link=download.php).
 
 ```bash
 java -jar target/efim-runner-jar-with-dependencies.jar \
@@ -210,11 +208,7 @@ java -jar target/efim-runner-jar-with-dependencies.jar \
 
 ### 4. HUIToUPIPostprocessing
 
-Post-processes a HUI result file (from EFIM or PeakUtility) and retains only true **UPI** patterns by verifying both subset and superset dominance on the computed utilities.
-
-A pattern P is kept if and only if:
-- `u(P \ {x}) < u(P)` for every item `x` in `P`  (removing any item lowers utility)
-- `u(P ∪ {y}) < u(P)` for every item `y` not in `P`  (adding any item lowers utility)
+Post-processes a HUI result file (from EFIM or PeakUtility) and retains only true **UPI** patterns.
 
 ```bash
 java -jar target/hui-to-upi-jar-with-dependencies.jar \
@@ -244,7 +238,7 @@ java -jar target/hui-to-upi-jar-with-dependencies.jar \
 
 ### 5. UPIToUMI (filter)
 
-Filters a UPI pattern file down to **UMI (Utility-Maximal Itemsets)** by removing any pattern dominated by a subset or superset with equal or higher utility.
+Filters a UPI pattern file to **UMI (Utility-Maximal Itemsets)**.
 
 ```bash
 java -jar target/upi-to-umi-jar-with-dependencies.jar \
