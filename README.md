@@ -17,8 +17,6 @@
    - [EfimRunner (EFIM baseline)](#3-efimrunner-efim-baseline)
    - [HUIToUPIPostprocessing](#4-huitoupipostprocessing)
    - [UPIToUMI](#5-upitoumifilter)
-   - [PeakPatternDiffValidator](#6-peakpatterndiffvalidator)
-   - [PeakPatternRuleTester](#7-peakpatternruletester)
 4. [Scripts](#scripts)
    - [run_efim.sh](#run_efimsh)
    - [run_compare_efim_peakutility.sh](#run_compare_efim_peakutilitysh)
@@ -47,7 +45,7 @@
 mvn package -DskipTests
 ```
 
-This produces **7 fat JARs** inside `target/`:
+This produces **5 fat JARs** inside `target/`:
 
 | JAR | Main class |
 |---|---|
@@ -56,8 +54,6 @@ This produces **7 fat JARs** inside `target/`:
 | `efim-runner-jar-with-dependencies.jar` | `cp26.mining.patterns.efim.EfimRunner` |
 | `hui-to-upi-jar-with-dependencies.jar` | `cp26.mining.examples.peakUtility.postprocessing.HUIToUPIPostprocessing` |
 | `upi-to-umi-jar-with-dependencies.jar` | `cp26.mining.examples.tools.UPIToUMI` |
-| `pattern-validator-jar-with-dependencies.jar` | `cp26.mining.examples.tools.PeakPatternDiffValidator` |
-| `rule-tester-jar-with-dependencies.jar` | `cp26.mining.examples.tools.PeakPatternRuleTester` |
 
 ---
 
@@ -251,60 +247,6 @@ java -jar target/upi-to-umi-jar-with-dependencies.jar \
 java -jar target/upi-to-umi-jar-with-dependencies.jar \
   datasets/patterns/connect_utility_spmf/UPI.txt \
   datasets/patterns/connect_utility_spmf/UMI.txt
-```
-
----
-
-### 6. PeakPatternDiffValidator
-
-Correctness and debugging tool. Compares two pattern files (e.g., produced with a rule enabled vs. disabled), reports patterns unique to each file, and verifies whether those patterns satisfy the true UPI peak condition on the raw database.
-
-```bash
-java -jar target/pattern-validator-jar-with-dependencies.jar \
-  <dataset> <onFile> <offFile> [maxReport]
-```
-
-| # | Argument | Default | Description |
-|---|---|---|---|
-| 1 | `dataset` | — | Raw HUI-format dataset |
-| 2 | `onFile` | — | Pattern file A (e.g., rule enabled) |
-| 3 | `offFile` | — | Pattern file B (e.g., rule disabled) |
-| 4 | `maxReport` | `20` | Max number of invalid patterns to print |
-
-**Example:**
-
-```bash
-java -jar target/pattern-validator-jar-with-dependencies.jar \
-  datasets/test_dataset/tiny_manual.txt \
-  results_rule_on.txt \
-  results_rule_off.txt \
-  50
-```
-
----
-
-### 7. PeakPatternRuleTester
-
-Unit-tests one specific hand-picked itemset against the `PropPeakUtility` propagator. Fixes the pattern in the CP model, calls `propagate()`, and reports whether a contradiction is raised and which rule triggered it.
-
-```bash
-java -jar target/rule-tester-jar-with-dependencies.jar \
-  <dataset> <minUtil> <rulesMask> <itemsCsv>
-```
-
-| # | Argument | Description |
-|---|---|---|
-| 1 | `dataset` | Raw HUI-format dataset |
-| 2 | `minUtil` | Integer minimum utility threshold |
-| 3 | `rulesMask` | 8-bit binary string (e.g. `11111111`) |
-| 4 | `itemsCsv` | Comma-separated item indices, e.g. `"1,5,10"` |
-
-**Example:**
-
-```bash
-java -jar target/rule-tester-jar-with-dependencies.jar \
-  datasets/test_dataset/tiny_manual.txt \
-  20 11111111 "1,3,5"
 ```
 
 ---
