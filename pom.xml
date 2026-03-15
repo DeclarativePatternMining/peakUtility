@@ -1,15 +1,4 @@
 <?xml version="1.0"?>
-<!--
-
-    This file is part of cp26:peakutility (https://gitlab.com/chaver/choco-mining)
-
-    Copyright (c) 2026, IMT Atlantique
-
-    Licensed under the MIT license.
-
-    See LICENSE file in the project root for full license information.
-
--->
 <project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd"
          xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
