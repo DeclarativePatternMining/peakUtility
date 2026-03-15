@@ -367,7 +367,7 @@ Output: `datasets/results/rule8_k_impact/<dataset>/rule8_k_impact.csv` + `.tex`
 
 ### `datasets/SYNTH/`
 
-47 synthetic datasets `S01_synth.txt` – `S47_synth.txt`, used for large-scale benchmarking across varying density, size, and utility distributions.
+47 synthetic datasets `S01_synth.txt` – `S47_synth.txt` with varying density, size, and utility distributions.
 
 ### `datasets/test_dataset/`
 
