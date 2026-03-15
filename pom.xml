@@ -19,14 +19,14 @@
     </licenses>
     <developers>
         <developer>
-            <name>Charles Vernerey</name>
-            <email>charlesvernerey2@gmail.com</email>
+            <name></name>
+            <email></email>
         </developer>
     </developers>
     <scm>
-        <connection>scm:git:git://gitlab.com/chaver/data-mining.git</connection>
-        <developerConnection>scm:git:ssh://gitlab.com:chaver/data-mining.git</developerConnection>
-        <url>http://gitlab.com/chaver/data-mining/tree/master</url>
+        <connection></connection>
+        <developerConnection></developerConnection>
+        <url></url>
     </scm>
     <distributionManagement>
         <snapshotRepository>
