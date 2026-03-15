@@ -1,0 +1,16 @@
+target/
+
+# Java build artifacts
+*.class
+
+# Common runtime outputs
+output.txt
+*.log
+
+# Generated experiment outputs
+datasets/results/
+datasets/patterns/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
