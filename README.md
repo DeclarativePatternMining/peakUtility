@@ -68,9 +68,7 @@ This produces **7 fat JARs** inside `target/`:
 > mvn package -DskipTests
 > ```
 
-### 1. PeakUtility (main miner)
-
-The primary mining engine. Uses a CP model with the `PropPeakUtility` propagator implementing pruning rules R1–R8.
+### 1. PeakUtility (Global constraint)
 
 ```bash
 java -jar target/peakutility-jar-with-dependencies.jar \
